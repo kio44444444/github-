@@ -12,7 +12,9 @@
       "Bash(reg query:*)",
       "Bash(powershell:*)",
       "Bash(git pull:*)",
-      "Bash(streamlit run:*)"
+      "Bash(streamlit run:*)",
+      "Bash(git fetch:*)",
+      "Bash(git rev-list:*)"
     ]
   }
 }

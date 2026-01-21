@@ -374,8 +374,8 @@ class GitOperations:
         """
         current_branch = self.get_current_branch()
 
-        # 检查是否有 upstream
-        has_upstream = self._run_command(f"git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null").returncode == 0
+        # 检查是否有 upstream (使用普通字符串避免 @{u} 被当作格式化变量)
+        has_upstream = self._run_command("git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null").returncode == 0
 
         if not has_upstream and set_upstream:
             # 新分支，使用 -u 设置上游
@@ -396,10 +396,10 @@ class GitOperations:
 
     def check_remote_has_updates(self):
         """
-        检查远程是否有新提交
-        对应命令: git rev-parse HEAD @{u}
+        检查远程是否有新提交（本地落后远程）
+        对应命令: git rev-list --count --left-right @{upstream}...HEAD
         """
-        behind, _ = self.get_ahead_behind()
+        ahead, behind = self.get_ahead_behind()
         return behind > 0
 
     def get_config_files_status(self):
