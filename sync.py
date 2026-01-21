@@ -405,6 +405,141 @@ class GitOperations:
 
         return changed_config
 
+    def set_remote_url(self, url, remote_name="origin"):
+        """
+        设置远程仓库地址
+        对应命令: git remote set-url origin <url>
+        """
+        result = self._run_command(f'git remote set-url {remote_name} "{url}"')
+        if result:
+            self.console_output.append(("", f'>>> git remote set-url {remote_name} "{url}"\n', "command"))
+            if result.stdout:
+                self.console_output.append(("", result.stdout, "output"))
+            if result.stderr:
+                self.console_output.append(("", result.stderr, "output"))
+        return result and result.returncode == 0
+
+    def get_all_branches(self):
+        """
+        获取所有分支（本地和远程）
+        对应命令: git branch -a
+        """
+        result = self._run_command("git branch -a")
+        if result and result.returncode == 0:
+            branches = []
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    is_current = line.strip().startswith('*')
+                    branch_name = line.strip().replace('*', '').strip()
+                    # 去掉 remote 前缀
+                    if branch_name.startswith('remotes/origin/'):
+                        branch_name = branch_name.replace('remotes/origin/', '')
+                    elif branch_name.startswith('remotes/'):
+                        continue
+                    branches.append({
+                        'name': branch_name,
+                        'current': is_current,
+                        'is_remote': 'remotes/' in line
+                    })
+            return branches
+        return []
+
+    def get_local_branches(self):
+        """
+        获取本地分支列表
+        对应命令: git branch
+        """
+        result = self._run_command("git branch")
+        if result and result.returncode == 0:
+            branches = []
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    is_current = line.strip().startswith('*')
+                    branch_name = line.strip().replace('*', '').strip()
+                    branches.append({
+                        'name': branch_name,
+                        'current': is_current
+                    })
+            return branches
+        return []
+
+    def get_remote_branches(self):
+        """
+        获取远程分支列表
+        对应命令: git branch -r
+        """
+        result = self._run_command("git branch -r")
+        if result and result.returncode == 0:
+            branches = []
+            for line in result.stdout.strip().split('\n'):
+                if line.strip() and 'HEAD' not in line:
+                    branch_name = line.strip().replace('origin/', '').strip()
+                    if branch_name and branch_name not in [b['name'] for b in branches]:
+                        branches.append(branch_name)
+            return branches
+        return []
+
+    def create_branch(self, branch_name):
+        """
+        创建新分支
+        对应命令: git checkout -b <branch_name>
+        """
+        result = self._run_command(f'git checkout -b {branch_name}')
+        if result:
+            self.console_output.append(("", f'>>> git checkout -b {branch_name}\n', "command"))
+            if result.stdout:
+                self.console_output.append(("", result.stdout, "output"))
+            if result.stderr:
+                self.console_output.append(("", result.stderr, "output"))
+        return result and result.returncode == 0
+
+    def switch_branch(self, branch_name):
+        """
+        切换分支
+        对应命令: git checkout <branch_name>
+        """
+        result = self._run_command(f'git checkout {branch_name}')
+        if result:
+            self.console_output.append(("", f'>>> git checkout {branch_name}\n', "command"))
+            if result.stdout:
+                self.console_output.append(("", result.stdout, "output"))
+            if result.stderr:
+                self.console_output.append(("", result.stderr, "output"))
+        return result and result.returncode == 0
+
+    def delete_branch(self, branch_name, force=False):
+        """
+        删除本地分支
+        对应命令: git branch -d/-D <branch_name>
+        """
+        flag = '-D' if force else '-d'
+        result = self._run_command(f'git branch {flag} {branch_name}')
+        if result:
+            self.console_output.append(("", f'>>> git branch {flag} {branch_name}\n', "command"))
+            if result.stdout:
+                self.console_output.append(("", result.stdout, "output"))
+            if result.stderr:
+                self.console_output.append(("", result.stderr, "output"))
+        return result and result.returncode == 0
+
+    def create_and_checkout_branch(self, branch_name, start_point=None):
+        """
+        创建并切换到新分支
+        对应命令: git checkout -b <branch_name> [start_point]
+        """
+        if start_point:
+            cmd = f'git checkout -b {branch_name} {start_point}'
+        else:
+            cmd = f'git checkout -b {branch_name}'
+        result = self._run_command(cmd)
+        if result:
+            self.console_output.append(("", f'>>> {cmd}\n', "command"))
+            if result.stdout:
+                self.console_output.append(("", result.stdout, "output"))
+            if result.stderr:
+                self.console_output.append(("", result.stderr, "output"))
+        return result and result.returncode == 0
+
 
 # ==================== UI 组件函数 ====================
 
@@ -617,6 +752,156 @@ def main():
 
         st.markdown("---")
 
+        # 远程仓库管理
+        st.markdown("### 🔗 远程仓库")
+        remote_url = git_ops.get_remote_url()
+        if remote_url:
+            st.markdown(f"""
+            <div style="font-size: 0.75rem; color: #a0aec0; margin-bottom: 0.5rem;">
+            当前远程:<br>
+            <code style="word-break: break-all;">{remote_url}</code>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with st.expander("修改远程仓库地址"):
+            new_remote_url = st.text_input(
+                "新仓库地址",
+                placeholder="https://github.com/用户名/仓库名.git",
+                value=remote_url or "",
+                key="remote_url_input"
+            )
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("应用", use_container_width=True, key="apply_remote"):
+                    if new_remote_url and new_remote_url != remote_url:
+                        git_ops.console_output = []
+                        if git_ops.set_remote_url(new_remote_url):
+                            st.session_state.console_output = git_ops.console_output
+                            st.session_state.last_action = "remote_updated"
+                            st.rerun()
+                        else:
+                            st.session_state.console_output = git_ops.console_output
+                            st.session_state.last_action = "remote_error"
+                            st.rerun()
+            with col_b:
+                if st.button("重置", use_container_width=True, key="reset_remote"):
+                    st.rerun()
+
+        st.markdown("---")
+
+        # 分支管理
+        st.markdown("### 🌿 分支管理")
+
+        # 获取本地和远程分支
+        local_branches = git_ops.get_local_branches()
+        remote_branches = git_ops.get_remote_branches()
+        current_branch = git_ops.get_current_branch()
+
+        # 显示当前分支
+        st.markdown(f"""
+        <div style="font-size: 0.75rem; color: #a0aec0; margin-bottom: 0.5rem;">
+        当前分支: <span style="color: #667eea; font-weight: bold;">{current_branch}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 切换分支
+        with st.expander("切换分支"):
+            if local_branches:
+                branch_names = [b['name'] for b in local_branches]
+                switch_to = st.selectbox(
+                    "选择要切换的分支",
+                    branch_names,
+                    index=branch_names.index(current_branch) if current_branch in branch_names else 0,
+                    key="switch_branch_select"
+                )
+                if st.button("切换", use_container_width=True, key="switch_branch_btn"):
+                    if switch_to != current_branch:
+                        git_ops.console_output = []
+                        if git_ops.switch_branch(switch_to):
+                            st.session_state.console_output = git_ops.console_output
+                            st.session_state.last_action = "branch_switched"
+                            st.rerun()
+                        else:
+                            st.session_state.console_output = git_ops.console_output
+                            st.session_state.last_action = "branch_switch_error"
+                            st.rerun()
+
+        # 创建新分支
+        with st.expander("创建新分支"):
+            new_branch_name = st.text_input(
+                "新分支名称",
+                placeholder="feature/new-feature",
+                key="new_branch_input"
+            )
+            if st.button("创建分支", use_container_width=True, key="create_branch_btn"):
+                if new_branch_name:
+                    git_ops.console_output = []
+                    if git_ops.create_branch(new_branch_name):
+                        st.session_state.console_output = git_ops.console_output
+                        st.session_state.last_action = "branch_created"
+                        st.rerun()
+                    else:
+                        st.session_state.console_output = git_ops.console_output
+                        st.session_state.last_action = "branch_create_error"
+                        st.rerun()
+
+        # 从远程创建本地分支
+        if remote_branches:
+            with st.expander("从远程创建分支"):
+                checkout_remote = st.selectbox(
+                    "选择远程分支",
+                    [b for b in remote_branches if b != current_branch],
+                    key="checkout_remote_select"
+                )
+                if st.button("检出并创建", use_container_width=True, key="checkout_remote_btn"):
+                    git_ops.console_output = []
+                    if git_ops.create_and_checkout_branch(checkout_remote, f"origin/{checkout_remote}"):
+                        st.session_state.console_output = git_ops.console_output
+                        st.session_state.last_action = "branch_created_from_remote"
+                        st.rerun()
+                    else:
+                        st.session_state.console_output = git_ops.console_output
+                        st.session_state.last_action = "branch_create_error"
+                        st.rerun()
+
+        # 删除分支
+        if len(local_branches) > 1:
+            with st.expander("删除分支"):
+                deletable_branches = [b['name'] for b in local_branches if not b['current']]
+                if deletable_branches:
+                    delete_branch = st.selectbox(
+                        "选择要删除的分支",
+                        deletable_branches,
+                        key="delete_branch_select"
+                    )
+                    col_d1, col_d2 = st.columns(2)
+                    with col_d1:
+                        if st.button("删除", use_container_width=True, key="delete_branch_btn"):
+                            git_ops.console_output = []
+                            if git_ops.delete_branch(delete_branch):
+                                st.session_state.console_output = git_ops.console_output
+                                st.session_state.last_action = "branch_deleted"
+                                st.rerun()
+                            else:
+                                st.session_state.console_output = git_ops.console_output
+                                st.session_state.last_action = "branch_delete_error"
+                                st.rerun()
+                    with col_d2:
+                        if st.button("强制删除", use_container_width=True, key="force_delete_branch_btn"):
+                            git_ops.console_output = []
+                            if git_ops.delete_branch(delete_branch, force=True):
+                                st.session_state.console_output = git_ops.console_output
+                                st.session_state.last_action = "branch_deleted"
+                                st.rerun()
+                            else:
+                                st.session_state.console_output = git_ops.console_output
+                                st.session_state.last_action = "branch_delete_error"
+                                st.rerun()
+                else:
+                    st.info("没有可删除的分支")
+
+        st.markdown("---")
+
         st.markdown("""
         <div class="help-text">
             <p><strong>使用说明:</strong></p>
@@ -738,6 +1023,24 @@ def main():
             render_error_box("推送失败", "请检查网络连接、仓库权限或是否有冲突需要解决。")
         elif st.session_state.last_action == "add_error":
             render_error_box("添加文件失败", "请检查文件权限或 Git 仓库状态。")
+        elif st.session_state.last_action == "remote_updated":
+            render_success_box("远程仓库已更新", "远程仓库地址已成功修改。")
+        elif st.session_state.last_action == "remote_error":
+            render_error_box("修改失败", "远程仓库地址修改失败，请检查地址格式是否正确。")
+        elif st.session_state.last_action == "branch_switched":
+            render_success_box("分支切换成功", f"已切换到新分支，请继续工作。")
+        elif st.session_state.last_action == "branch_switch_error":
+            render_error_box("切换失败", "分支切换失败，请检查是否有未提交的更改。")
+        elif st.session_state.last_action == "branch_created":
+            render_success_box("分支创建成功", "新分支已创建并自动切换。")
+        elif st.session_state.last_action == "branch_created_from_remote":
+            render_success_box("分支检出成功", "已从远程创建并切换到新分支。")
+        elif st.session_state.last_action == "branch_create_error":
+            render_error_box("创建失败", "分支创建失败，请检查分支名称是否合法。")
+        elif st.session_state.last_action == "branch_deleted":
+            render_success_box("分支删除成功", "分支已成功删除。")
+        elif st.session_state.last_action == "branch_delete_error":
+            render_error_box("删除失败", "分支删除失败，可能存在未合并的更改。")
 
     # 控制台输出
     if st.session_state.console_output:
@@ -747,7 +1050,7 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #718096; font-size: 0.8rem; padding: 1rem;">
-        Git 同步工具 v1.0 | 基于 Streamlit 构建 | 跨端同步无忧
+        Git 同步工具 v1.1 | 基于 Streamlit 构建 | 跨端同步无忧
     </div>
     """, unsafe_allow_html=True)
 
