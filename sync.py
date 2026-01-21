@@ -252,6 +252,8 @@ class GitOperations:
                 cwd=self.repo_path,
                 capture_output=capture_output,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # 替换无法解码的字符，避免中文文件名报错
                 timeout=60  # 60秒超时
             )
             return result
@@ -364,12 +366,25 @@ class GitOperations:
                 self.console_output.append(("", result.stderr, "output"))
         return result and result.returncode == 0
 
-    def push(self, force=False):
+    def push(self, force=False, set_upstream=True):
         """
         推送到远程仓库
         对应命令: git push 或 git push --force
+        对应命令: git push -u origin <branch> (新分支设置上游)
         """
-        cmd = "git push --force" if force else "git push"
+        current_branch = self.get_current_branch()
+
+        # 检查是否有 upstream
+        has_upstream = self._run_command(f"git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null").returncode == 0
+
+        if not has_upstream and set_upstream:
+            # 新分支，使用 -u 设置上游
+            cmd = f"git push -u origin {current_branch}"
+            if force:
+                cmd = f"git push -u origin {current_branch} --force"
+        else:
+            cmd = "git push --force" if force else "git push"
+
         result = self._run_command(cmd)
         if result:
             self.console_output.append(("", f">>> {cmd}\n", "command"))
