@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del \"D:\\\\cc\\\\github工具2.0\\\\CLAUDE.MD\")",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
