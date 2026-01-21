@@ -7,7 +7,12 @@
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git config:*)",
+      "Bash(reg query:*)",
+      "Bash(powershell:*)",
+      "Bash(git pull:*)",
+      "Bash(streamlit run:*)"
     ]
   }
 }
